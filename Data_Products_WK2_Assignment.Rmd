@@ -1,0 +1,67 @@
+---
+title: "Data Products - Argentina 2017 imports of phys/chem analysis apparatus"
+author: "Stephen Gillanders"
+date: "9/28/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r libraries,echo=FALSE,message=FALSE,results=FALSE}
+library(leaflet)
+library(tidyr)
+library(Hmisc)
+```
+## Data Source
+
+The data on imports comes from the Argentine Government's National Institute for Statistics and Census (INDEC).
+
+The data can be found from this [link](https://comex.indec.gov.ar/search/imports/2017/Y/90278099/C). You should see a text "Se encontraron 40 resultados, haga click aqui para descargarlos.": click on it to retrieve the data. The product code "90278099" is for "Instrumentos y aparatos p/analisis fisicos o quimicos. ncop", i.e. "Instruments and apparatus for physical or chemical analysis".
+
+I changed the column headings in the file to:
+"Year";"NCM";"Product";"Country";"Net.weight";"USD.CIF".
+where:
+
+- Year =  2017
+- NCM = product code according to Mercosur Common Nomenclature (fixed: 90278099)
+- Product = product description (fixed: "Instrumentos y aparatos p/analisis fisicos o quimicos, ncop.")
+- Country = Original Spanish name translated to English by me
+- Net.weight = Kg, total
+- USD.CIF = total value in US Dollars, CIF
+
+Country data (for latitude and longitude) was taken from [google dataset publishing language](https://developers.google.com/public-data/docs/canonical/countries_csv) countries.csv by importing HTML_tables into OpenOffice and saving as a .csv file.
+
+
+```{r read_data}
+df <- read.csv("Importaciones_2017.csv",sep=";",header=TRUE)
+dfc <- read.csv("countries_google.csv",sep=";",header=TRUE)
+head(df[,-3],4)
+head(dfc,4)
+```
+```{r process_data}
+tdf <- merge(df,dfc,by.x="Country",by.y="name")
+tdf$popup <- paste("<b>",tdf$country,"/",
+                   tdf$Country,
+                   "</b><br>Total imports (USD): ",format(tdf$USD.CIF,big.mark=","))
+tdf$quant <- cut2(tdf$USD.CIF,g=10)
+tdf$radius <- as.numeric(tdf$quant)*50000
+```
+
+## Map of imports to Argentina by country of origin
+
+```{r imports_plot, echo=FALSE}
+heatc <- heat.colors(10)
+pal <- colorFactor(heatc,tdf$quant)
+my_plot <- tdf %>% leaflet() %>% addTiles() %>% 
+    addCircles(lat=~latitude,lng=~longitude,
+               popup=~popup,
+               radius=~radius,
+               color=~pal(quant)) %>%
+    addLegend("bottomright",colors=heatc,
+              labels=levels(tdf$quant),
+              title="Imports (USD)",
+              opacity=1)
+my_plot
+```
+
